@@ -1,8 +1,10 @@
 const Razorpay = require('razorpay');
+
 const allowedOrigins = [
   "https://photobooth-zm5n.onrender.com",
   "http://localhost:4200"
 ];
+
 exports.handler = async (event) => {
   const origin = event.headers.origin;
   const corsHeaders = {
@@ -10,13 +12,8 @@ exports.handler = async (event) => {
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
   };
-  if (!event.body) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'No request body received' }),
-      };
-    }
-  // ✅ Handle preflight OPTIONS request
+
+  // ✅ Handle preflight OPTIONS request early
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -24,14 +21,23 @@ exports.handler = async (event) => {
       body: "Preflight OK"
     };
   }
+
   const instance = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
   });
 
   try {
+    if (!event.body) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'No request body received' }),
+      };
+    }
+
     const body = JSON.parse(event.body);
-     const qrPayload = {
+    const qrPayload = {
       type: body.type,
       name: body.name,
       usage: body.usage,
@@ -39,19 +45,21 @@ exports.handler = async (event) => {
       payment_amount: body.payment_amount,
       description: body.description,
     };
+
     const qrCode = await instance.qrCode.create(qrPayload);
 
     return {
-     statusCode: 200,
+      statusCode: 200,
       headers: corsHeaders,
-     body: JSON.stringify(qrCode),
+      body: JSON.stringify(qrCode),
     };
+
   } catch (error) {
-    console.log(error);
+    console.error("Razorpay Error:", error);
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ error: error.message })
+      body: JSON.stringify({ error: error.message }),
     };
   }
 };
